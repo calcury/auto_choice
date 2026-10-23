@@ -111,7 +111,8 @@ body::before {
   margin-bottom: 9px;
 }
 
-.field-head label {
+.field-head label,
+.field-head .field-label {
   font-size: 14px;
   font-weight: 600;
   color: var(--ink);
@@ -129,6 +130,56 @@ body::before {
   justify-content: space-between;
   margin-top: 7px;
   font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* ---------- 校内外切换 ---------- */
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--line-soft);
+}
+
+.segmented button {
+  flex: 1;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+
+.segmented button.active {
+  background: #fff;
+  color: var(--brand-ink);
+  box-shadow: 0 1px 3px rgba(60, 40, 20, .14);
+}
+
+.segmented button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+/* 校外时时间不起作用，整块压暗 */
+.field.is-off .field-head,
+.field.is-off input[type="range"],
+.field.is-off .ticks {
+  opacity: .38;
+}
+
+.field.is-off input[type="range"] { cursor: default; }
+
+.field-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--ink-3);
 }
 
@@ -455,6 +506,35 @@ button { font: inherit; color: inherit; }
   font-weight: 600;
   margin-left: 5px;
   vertical-align: 1px;
+}
+
+.tag-campus {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--line-soft);
+  color: var(--ink-2);
+  font-size: 10.5px;
+  font-weight: 600;
+  margin-left: 5px;
+  vertical-align: 1px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.check-row input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--brand);
+  cursor: pointer;
 }
 
 /* ---------- form ---------- */

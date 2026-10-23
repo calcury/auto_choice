@@ -25,11 +25,23 @@
   <section class="panel" aria-label="筛选条件">
     <div class="field">
       <div class="field-head">
+        <span class="field-label">范围</span>
+        <output id="campusOut">—</output>
+      </div>
+      <div class="segmented" role="group" aria-label="校内还是校外">
+        <button id="campusOn" type="button" data-campus="on" class="active" aria-pressed="true">校内</button>
+        <button id="campusOff" type="button" data-campus="off" aria-pressed="false">校外</button>
+      </div>
+    </div>
+
+    <div class="field" id="timeField">
+      <div class="field-head">
         <label for="time">可用时间</label>
         <output id="timeOut" for="time">1 小时 30 分</output>
       </div>
-      <input id="time" type="range" min="10" max="180" step="5" value="90">
-      <div class="ticks"><span>10 分</span><span>1.5 小时</span><span>3 小时</span></div>
+      <input id="time" type="range" min="10" max="120" step="5" value="90">
+      <div class="ticks"><span>10 分</span><span>1 小时</span><span>2 小时</span></div>
+      <p id="timeHint" class="field-note" hidden>校外不看时间，来回路上不好估，直接按口味和人数挑。</p>
     </div>
 
     <div class="field">
@@ -100,6 +112,10 @@
             <input id="addTaste" type="range" min="0" max="100" step="1" value="50">
           </label>
         </div>
+        <label class="check-row">
+          <input id="addOffCampus" type="checkbox">
+          <span>标记为校外（不看时间）</span>
+        </label>
         <button class="btn-soft full" type="submit">加入清单</button>
         <p id="addError" class="form-error" hidden></p>
       </form>

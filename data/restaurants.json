@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "note": "minMinutes/maxMinutes 单位为分钟；taste 0=极清淡 1=极重口；maxPeople 为建议人数上限。直接改这个文件并推送，页面「从仓库重载」即可生效。",
+  "version": 2,
+  "note": "minMinutes/maxMinutes 单位为分钟；taste 0=极清淡 1=极重口；maxPeople 为建议人数上限；校内 true=校内、false=校外（校外不看时间）。直接改这个文件并推送，页面「从仓库重载」即可生效。",
   "restaurants": [
     {
       "id": "canteen-1",
@@ -9,7 +9,8 @@
       "maxMinutes": 45,
       "taste": 0.25,
       "maxPeople": 12,
-      "note": "打饭快，菜式轮换"
+      "note": "打饭快，菜式轮换",
+      "校内": true
     },
     {
       "id": "canteen-2",
@@ -18,7 +19,8 @@
       "maxMinutes": 50,
       "taste": 0.45,
       "maxPeople": 10,
-      "note": "现炒，饭点要等"
+      "note": "现炒，饭点要等",
+      "校内": true
     },
     {
       "id": "noodle-wang",
@@ -27,7 +29,8 @@
       "maxMinutes": 60,
       "taste": 0.55,
       "maxPeople": 6,
-      "note": "汤头浓，出餐稳定"
+      "note": "汤头浓，出餐稳定",
+      "校内": true
     },
     {
       "id": "shaxian",
@@ -36,7 +39,8 @@
       "maxMinutes": 35,
       "taste": 0.4,
       "maxPeople": 4,
-      "note": "快，位子少"
+      "note": "快，位子少",
+      "校内": true
     },
     {
       "id": "mcd",
@@ -45,7 +49,8 @@
       "maxMinutes": 40,
       "taste": 0.6,
       "maxPeople": 8,
-      "note": "自助点单，不挑人"
+      "note": "自助点单，不挑人",
+      "校内": true
     },
     {
       "id": "salad",
@@ -54,7 +59,8 @@
       "maxMinutes": 40,
       "taste": 0.08,
       "maxPeople": 6,
-      "note": "冷食，吃完不困"
+      "note": "冷食，吃完不困",
+      "校内": true
     },
     {
       "id": "hunan",
@@ -63,16 +69,8 @@
       "maxMinutes": 100,
       "taste": 0.85,
       "maxPeople": 10,
-      "note": "辣，适合多人点菜"
-    },
-    {
-      "id": "hotpot",
-      "name": "川味火锅",
-      "minMinutes": 90,
-      "maxMinutes": 180,
-      "taste": 0.95,
-      "maxPeople": 12,
-      "note": "耗时大户，得留足时间"
+      "note": "辣，适合多人点菜",
+      "校内": true
     },
     {
       "id": "japanese",
@@ -81,7 +79,8 @@
       "maxMinutes": 75,
       "taste": 0.3,
       "maxPeople": 6,
-      "note": "安静，出餐稍慢"
+      "note": "安静，出餐稍慢",
+      "校内": true
     },
     {
       "id": "lanzhou",
@@ -90,7 +89,8 @@
       "maxMinutes": 50,
       "taste": 0.45,
       "maxPeople": 8,
-      "note": "翻台快"
+      "note": "翻台快",
+      "校内": true
     },
     {
       "id": "chachanteng",
@@ -99,16 +99,8 @@
       "maxMinutes": 80,
       "taste": 0.35,
       "maxPeople": 8,
-      "note": "选择多，适合凑人"
-    },
-    {
-      "id": "bbq",
-      "name": "烤肉自助",
-      "minMinutes": 120,
-      "maxMinutes": 180,
-      "taste": 0.9,
-      "maxPeople": 10,
-      "note": "至少两小时，别赶时间"
+      "note": "选择多，适合凑人",
+      "校内": true
     },
     {
       "id": "dumpling",
@@ -117,7 +109,8 @@
       "maxMinutes": 70,
       "taste": 0.5,
       "maxPeople": 10,
-      "note": "实在，管饱"
+      "note": "实在，管饱",
+      "校内": true
     },
     {
       "id": "thai",
@@ -126,7 +119,8 @@
       "maxMinutes": 90,
       "taste": 0.75,
       "maxPeople": 6,
-      "note": "偏甜辣，评价两极"
+      "note": "偏甜辣，评价两极",
+      "校内": true
     },
     {
       "id": "convenience",
@@ -135,7 +129,8 @@
       "maxMinutes": 15,
       "taste": 0.3,
       "maxPeople": 2,
-      "note": "赶时间专属，站着吃"
+      "note": "赶时间专属，站着吃",
+      "校内": true
     },
     {
       "id": "dimsum",
@@ -144,7 +139,68 @@
       "maxMinutes": 120,
       "taste": 0.2,
       "maxPeople": 12,
-      "note": "清淡，但要慢慢吃"
+      "note": "清淡，但要慢慢吃",
+      "校内": true
+    },
+    {
+      "id": "hotpot",
+      "name": "川味火锅",
+      "minMinutes": 90,
+      "maxMinutes": 180,
+      "taste": 0.95,
+      "maxPeople": 12,
+      "note": "得留足半天",
+      "校内": false
+    },
+    {
+      "id": "bbq",
+      "name": "烤肉自助",
+      "minMinutes": 120,
+      "maxMinutes": 180,
+      "taste": 0.9,
+      "maxPeople": 10,
+      "note": "至少两小时，别赶时间",
+      "校内": false
+    },
+    {
+      "id": "mall-food",
+      "name": "商场美食层",
+      "minMinutes": 45,
+      "maxMinutes": 90,
+      "taste": 0.6,
+      "maxPeople": 20,
+      "note": "选择多，走过去十来分钟",
+      "校内": false
+    },
+    {
+      "id": "bbq-street",
+      "name": "街边烧烤",
+      "minMinutes": 90,
+      "maxMinutes": 150,
+      "taste": 0.95,
+      "maxPeople": 8,
+      "note": "出校门右转，适合晚上",
+      "校内": false
+    },
+    {
+      "id": "cafe-out",
+      "name": "街角咖啡简餐",
+      "minMinutes": 25,
+      "maxMinutes": 50,
+      "taste": 0.3,
+      "maxPeople": 4,
+      "note": "安静，适合两三个人",
+      "校内": false
+    },
+    {
+      "id": "fastfood-out",
+      "name": "校外快餐连锁",
+      "minMinutes": 20,
+      "maxMinutes": 40,
+      "taste": 0.55,
+      "maxPeople": 10,
+      "note": "出餐快，离校门 5 分钟",
+      "校内": false
     }
   ]
 }

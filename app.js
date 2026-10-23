@@ -33,6 +33,7 @@
     minutes: 90,
     taste: 0.5,
     people: 5,
+    campus: 'on',
     spots: [],
     lastPickId: null,
     rolling: false,
@@ -85,6 +86,9 @@
     const maxPeople = Number(raw.maxPeople);
     if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) return null;
 
+    // 配置里写的是中文键「校内」，内部统一成 onCampus
+    const campusFlag = typeof raw['校内'] === 'boolean' ? raw['校内'] : raw.onCampus;
+
     return {
       id: raw.id || `s-${Math.random().toString(36).slice(2, 9)}`,
       name: raw.name.trim().slice(0, 24),
@@ -93,6 +97,7 @@
       taste: Math.min(1, Math.max(0, Number.isFinite(taste) ? taste : 0.5)),
       maxPeople: Math.max(1, Math.round(Number.isFinite(maxPeople) ? maxPeople : 8)),
       note: typeof raw.note === 'string' ? raw.note.slice(0, 40) : '',
+      onCampus: campusFlag !== false,
       custom: raw.custom === true,
     };
   }
@@ -155,14 +160,22 @@
 
   function updateStatus() {
     const ctx = Engine.buildContext(new Date(), state.minutes);
-    const bits = [];
+    const offCampus = state.campus === 'off';
+    const count = state.spots.filter((s) => Engine.matchesCampus(s, state.campus)).length;
+    $('campusOut').textContent = `${count} 家`;
 
-    if (ctx.weekend) bits.push('周末 · 耗时上限压到中点');
-    if (ctx.peak > 0.05) bits.push('饭点 · 预计耗时推向上限');
-    if (bits.length === 0) bits.push('非饭点 · 按区间中点估算');
+    if (offCampus) {
+      $('statusText').textContent = '校外 · 不看时间';
+      $('statusAvail').textContent = '按口味和人数挑';
+    } else {
+      const bits = [];
+      if (ctx.weekend) bits.push('周末 · 耗时上限压到中点');
+      if (ctx.peak > 0.05) bits.push('饭点 · 预计耗时推向上限');
+      if (bits.length === 0) bits.push('非饭点 · 按区间中点估算');
 
-    $('statusText').textContent = bits.join(' · ');
-    $('statusAvail').textContent = `可用 ${fmtMinutes(ctx.usable)}（已留 ${ctx.buffer} 分）`;
+      $('statusText').textContent = bits.join(' · ');
+      $('statusAvail').textContent = `可用 ${fmtMinutes(ctx.usable)}（已留 ${ctx.buffer} 分）`;
+    }
 
     refreshSpotsIfNeeded(ctx);
   }
@@ -170,7 +183,7 @@
   /** 清单里每家的预计耗时随饭点变化，状态变了才重建列表 */
   let spotSig = null;
   function refreshSpotsIfNeeded(ctx) {
-    const sig = `${ctx.weekend}|${Math.round(ctx.peak * 10)}`;
+    const sig = `${state.campus}|${ctx.weekend}|${Math.round(ctx.peak * 10)}`;
     if (sig === spotSig) return;
     spotSig = sig;
     renderSpots(ctx);
@@ -198,11 +211,18 @@
         nameWrap.appendChild(tag);
       }
 
+      if (!spot.onCampus) {
+        const tag = document.createElement('span');
+        tag.className = 'tag-campus';
+        tag.textContent = '校外';
+        nameWrap.appendChild(tag);
+      }
+
       const sub = document.createElement('span');
       sub.className = 's-sub';
       const notePart = spot.note ? ` · ${spot.note}` : '';
       const exp = Math.round(Engine.expectedMinutes(spot, now));
-      const late = exp >= now.usable ? '（来不及）' : '';
+      const late = spot.onCampus && exp >= now.usable ? '（来不及）' : '';
       sub.textContent = `预计 ${exp} 分${late} · 口味 ${spot.taste.toFixed(2)} · ≤${spot.maxPeople} 人${notePart}`;
       nameWrap.appendChild(sub);
 
@@ -233,18 +253,17 @@
     $('resultMeta').textContent = '';
   }
 
-  function renderBreak(pick, ctx) {
+  function renderBreak(pick, ctx, campus) {
     const ul = $('resultBreak');
     ul.innerHTML = '';
     const spot = pick.spot;
 
+    const timeRow = campus === 'off'
+      ? { level: 'ok', label: '时间', text: '校外 · 不计时间', val: `预计 ${Math.round(pick.exp)} 分钟` }
+      : { level: 'ok', label: '时间', text: `预计 ${Math.round(pick.exp)} 分钟后吃完`, val: `可用 ${Math.round(ctx.usable)} 分钟` };
+
     const rows = [
-      {
-        level: 'ok',
-        label: '时间',
-        text: `预计 ${Math.round(pick.exp)} 分钟后吃完`,
-        val: `可用 ${Math.round(ctx.usable)} 分钟`,
-      },
+      timeRow,
       { level: pick.ta.level, label: '口味', text: `${tasteLabel(spot.taste)} ${spot.taste.toFixed(2)}`, val: `你选 ${state.taste.toFixed(2)}` },
       { level: pick.p.level, label: '人数', text: `建议 ≤ ${spot.maxPeople} 人`, val: `你们 ${state.people} 人` },
     ];
@@ -297,7 +316,7 @@
 
     const result = Engine.pickOne(
       state.spots,
-      { minutes: state.minutes, taste: state.taste, people: state.people },
+      { minutes: state.minutes, taste: state.taste, people: state.people, campus: state.campus },
       new Date(),
       excludeId
     );
@@ -306,8 +325,27 @@
     const nameEl = $('resultName');
     card.hidden = false;
 
+    /* 这个范围内一家店都没有 */
+    if (result.reason === 'empty') {
+      clearResult();
+      nameEl.classList.remove('rolling');
+      nameEl.classList.add('muted');
+
+      const offCampus = result.campus === 'off';
+      $('resultEyebrow').textContent = '这个范围还是空的';
+      nameEl.textContent = offCampus ? '还没有校外的店' : '还没有校内的店';
+      $('resultNote').textContent = offCampus
+        ? '在下面的清单里加一家，或者把 JSON 里的「校内」改成 false。'
+        : '在下面的清单里加一家，或者把 JSON 里的「校内」改成 true。';
+      $('resultMeta').textContent = '';
+      $('againBtn').disabled = true;
+      state.rolling = false;
+      updatePickAvailability();
+      return;
+    }
+
     /* 一家都来不及：不硬凑，直接把最快的那家摆出来当参考 */
-    if (result.noMatch) {
+    if (result.reason === 'time') {
       clearResult();
       nameEl.classList.remove('rolling');
       nameEl.classList.add('muted');
@@ -319,7 +357,7 @@
         ? `最快的一家也要 ${Math.round(near.exp)} 分钟，可用只剩 ${Math.round(result.ctx.usable)} 分钟。`
         : '';
       $('resultMeta').textContent = near
-        ? `把时间调到 ${Math.ceil(near.exp) + result.ctx.buffer + 1} 分钟以上就能选它。`
+        ? `把时间调到 ${Math.ceil(near.exp) + result.ctx.buffer + 1} 分钟以上就能选它，或者切到校外。`
         : '';
       $('againBtn').disabled = true;
       state.rolling = false;
@@ -340,10 +378,11 @@
     await rollName(nameEl, result.chosen.spot.name, names.length > 1 ? names : [result.chosen.spot.name]);
 
     $('resultNote').textContent = result.chosen.spot.note || '';
-    renderBreak(result.chosen, result.ctx);
+    renderBreak(result.chosen, result.ctx, result.campus);
 
-    $('resultMeta').textContent =
-      `${state.spots.length} 家里 ${result.timedCount} 家来得及（可用 ${Math.round(result.ctx.usable)} 分钟），按口味和人数加权抽中`;
+    $('resultMeta').textContent = result.campus === 'off'
+      ? `${result.scored.length} 家校外的店，不看时间，按口味和人数加权抽中`
+      : `${result.scored.length} 家里 ${result.timedCount} 家来得及（可用 ${Math.round(result.ctx.usable)} 分钟），按口味和人数加权抽中`;
 
     state.lastPickId = result.chosen.spot.id;
     state.rolling = false;
@@ -352,7 +391,26 @@
 
   /* ---------- 事件 ---------- */
 
+  function setCampus(value) {
+    state.campus = value === 'off' ? 'off' : 'on';
+    const offCampus = state.campus === 'off';
+
+    $('campusOn').classList.toggle('active', !offCampus);
+    $('campusOff').classList.toggle('active', offCampus);
+    $('campusOn').setAttribute('aria-pressed', String(!offCampus));
+    $('campusOff').setAttribute('aria-pressed', String(offCampus));
+
+    $('timeField').classList.toggle('is-off', offCampus);
+    $('time').disabled = offCampus;
+    $('timeHint').hidden = !offCampus;
+
+    updateStatus();
+  }
+
   function bindEvents() {
+    $('campusOn').addEventListener('click', () => setCampus('on'));
+    $('campusOff').addEventListener('click', () => setCampus('off'));
+
     $('time').addEventListener('input', (e) => {
       state.minutes = Number(e.target.value);
       renderReadouts();
@@ -411,6 +469,7 @@
       taste,
       maxPeople: Math.round(maxPeople),
       note: '',
+      onCampus: !$('addOffCampus').checked,
       custom: true,
     });
 
@@ -475,6 +534,7 @@
         taste: s.taste,
         maxPeople: s.maxPeople,
         note: s.note,
+        '校内': s.onCampus,
       })),
     };
 

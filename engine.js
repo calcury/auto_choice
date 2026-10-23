@@ -101,16 +101,32 @@
     };
   }
 
+  /* ---------- 校内外 ---------- */
+
+  /** 兼容配置里的中文键「校内」和内部字段 onCampus，缺省算校内 */
+  function isOnCampus(spot) {
+    if (typeof spot.onCampus === 'boolean') return spot.onCampus;
+    if (typeof spot['校内'] === 'boolean') return spot['校内'];
+    return true;
+  }
+
+  function matchesCampus(spot, campus) {
+    return campus === 'off' ? !isOnCampus(spot) : isOnCampus(spot);
+  }
+
   /* ---------- 汇总 ---------- */
 
   /**
-   * 时间是一道硬门槛：预计耗时必须严格小于可用时间，否则直接出局。
-   * 口味和人数只在「来得及」的店里决定谁更可能被抽中。
+   * 校内：时间是一道硬门槛，预计耗时必须严格小于可用时间。
+   * 校外：路上来回估不准，时间不参与判定。
+   * 口味和人数在剩下的店里决定谁更可能被抽中。
    */
   function scoreAll(spots, prefs, ctx, excludeId) {
+    const ignoreTime = prefs.campus === 'off';
+
     return spots.map((spot) => {
       const exp = expectedMinutes(spot, ctx);
-      const fits = exp < ctx.usable;
+      const fits = ignoreTime || exp < ctx.usable;
       const ta = tasteFactor(spot, prefs.taste);
       const p = peopleFactor(spot, prefs.people);
 
@@ -132,11 +148,20 @@
     return items[items.length - 1];
   }
 
-  /** 一步到位：卡时间 → 筛口味人数 → 抽一个 */
+  /** 一步到位：卡校内外 → 卡时间 → 筛口味人数 → 抽一个 */
   function pickOne(spots, prefs, date, excludeId) {
     const ctx = buildContext(date, prefs.minutes);
-    const scored = scoreAll(spots, prefs, ctx, excludeId);
+    const campus = prefs.campus === 'off' ? 'off' : 'on';
+    const candidates = spots.filter((s) => matchesCampus(s, campus));
 
+    if (candidates.length === 0) {
+      return {
+        ctx, campus, scored: [], pool: [], chosen: null,
+        reason: 'empty', timedCount: 0, nearest: [],
+      };
+    }
+
+    const scored = scoreAll(candidates, prefs, ctx, excludeId);
     const nearest = scored
       .slice()
       .sort((a, b) => a.exp - b.exp)
@@ -145,7 +170,7 @@
     const timed = scored.filter((it) => it.fits);
 
     if (timed.length === 0) {
-      return { ctx, scored, pool: [], chosen: null, noMatch: true, timedCount: 0, nearest };
+      return { ctx, campus, scored, pool: [], chosen: null, reason: 'time', timedCount: 0, nearest };
     }
 
     // 时间都够、只是口味或人数不理想时，仍然从来得及的店里选，不该报无解
@@ -154,10 +179,11 @@
 
     return {
       ctx,
+      campus,
       scored,
       pool,
       nearest,
-      noMatch: false,
+      reason: null,
       timedCount: timed.length,
       chosen: weightedPick(pool),
     };
@@ -169,6 +195,8 @@
     effectiveMax,
     expectedMinutes,
     buildContext,
+    isOnCampus,
+    matchesCampus,
     tasteFactor,
     peopleFactor,
     scoreAll,

@@ -26,7 +26,7 @@ function sample(prefs, dateOrFn, n = 4000) {
     .sort((a, b) => b.pct - a.pct);
 }
 
-const base = { minutes: 90, taste: 0.5, people: 5 };
+const base = { minutes: 90, taste: 0.5, people: 5, campus: 'on' };
 const byName = (name) => spots.find((s) => s.name === name);
 const rate = (list, name) => (list.find((x) => x.name === name) || { pct: 0 }).pct;
 
@@ -54,25 +54,24 @@ console.log('\n[2] 缓冲 5 分钟 + 严格小于');
 check('可用 = 输入 − 5', ctxCalm.usable === 85, `usable=${ctxCalm.usable}`);
 
 const solo = (minutes) => E.pickOne([wang], { ...base, minutes }, workday());
-check('正好卡点（可用 45，预计 45）不算通过', solo(50).noMatch === true);
-check('多给 1 分钟就通过', solo(51).noMatch === false);
+check('正好卡点（可用 45，预计 45）不算通过', solo(50).reason === 'time');
+check('多给 1 分钟就通过', solo(51).reason === null);
 
 /* ---------- 3. 默认条件 ---------- */
-console.log('\n[3] 默认：90 分钟 / 不挑 / 5 人 / 周五 15:00');
+console.log('\n[3] 默认：校内 / 90 分钟 / 不挑 / 5 人 / 周五 15:00');
 const d3 = sample(base, workday);
 d3.slice(0, 6).forEach((x) => console.log(`     ${x.name.padEnd(8, '　')} ${x.pct.toFixed(1)}%`));
 const timely = E.pickOne(spots, base, workday()).timedCount;
-check('16 家里 13 家来得及', timely === 13, `timed=${timely}`);
-check('3 小时的火锅出局', rate(d3, '川味火锅') === 0);
-check('2 小时的烤肉出局', rate(d3, '烤肉自助') === 0);
-check('2 小时的早茶出局', rate(d3, '粤式早茶') === 0);
+check('校内 14 家里 13 家来得及', timely === 13, `timed=${timely}`);
+check('校外店不会混进校内结果', rate(d3, '川味火锅') === 0 && rate(d3, '商场美食层') === 0);
+check('2 小时的早茶来不及', rate(d3, '粤式早茶') === 0);
 check('分布没有一家独大', d3[0].pct < 16, `最高 ${d3[0].pct.toFixed(1)}%`);
 check('来得及的都有机会', d3.length >= 10);
 
 /* ---------- 4. 时间收紧 ---------- */
 console.log('\n[4] 时间收紧');
 const r10 = E.pickOne(spots, { ...base, minutes: 10 }, workday());
-check('10 分钟无解（可用只剩 5）', r10.noMatch === true, `usable=${r10.ctx.usable}`);
+check('10 分钟无解（可用只剩 5）', r10.reason === 'time', `usable=${r10.ctx.usable}`);
 check('无解时给出最快的一家', r10.nearest[0].spot.name === '便利店饭团', r10.nearest[0].spot.name);
 
 const d20 = sample({ ...base, minutes: 20 }, workday(), 2000);
@@ -95,9 +94,9 @@ check('重口火锅来不及，权重也为 0', rate(d5, '川味火锅') === 0);
 check('清淡的沙拉明显占优', rate(d5, '轻食沙拉碗') > 25, `${rate(d5, '轻食沙拉碗').toFixed(0)}%`);
 check('早茶 90 分钟来不及，自然不出现', rate(d5, '粤式早茶') === 0);
 
-/* ---------- 6. 口味：极重口（放长到 3 小时，排除时间门槛干扰） ---------- */
-console.log('\n[6] 口味拉到最重口（1.00），180 分钟');
-const d6 = sample({ ...base, minutes: 180, taste: 1 }, workday, 3000);
+/* ---------- 6. 口味：极重口（放长到 2 小时，排除时间门槛干扰） ---------- */
+console.log('\n[6] 口味拉到最重口（1.00），120 分钟');
+const d6 = sample({ ...base, minutes: 120, taste: 1 }, workday, 3000);
 console.log(`     ${d6.slice(0, 5).map((x) => `${x.name} ${x.pct.toFixed(0)}%`).join(' | ')}`);
 check('清淡的沙拉仍有可观概率', rate(d6, '轻食沙拉碗') > 4, `${rate(d6, '轻食沙拉碗').toFixed(1)}%`);
 check('清淡的早茶仍有可观概率', rate(d6, '粤式早茶') > 3, `${rate(d6, '粤式早茶').toFixed(1)}%`);
@@ -136,13 +135,13 @@ const bigTable = ['一层员工食堂', '二层盖浇饭窗口', '东北饺子�
   .reduce((sum, name) => sum + rate(d10, name), 0);
 check('能坐 10 人的店占明显多数', bigTable > 55, `${bigTable.toFixed(0)}%`);
 
-/* ---------- 11. 3 小时 ---------- */
-console.log('\n[11] 给足 3 小时');
-const d11 = sample({ ...base, minutes: 180 }, workday, 3000);
-check('火锅终于来得及', rate(d11, '川味火锅') > 0.3, `${rate(d11, '川味火锅').toFixed(1)}%`);
-check('烤肉也来得及', rate(d11, '烤肉自助') > 1, `${rate(d11, '烤肉自助').toFixed(1)}%`);
-check('3 小时时全部 16 家都来得及',
-  E.pickOne(spots, { ...base, minutes: 180 }, workday()).timedCount === 16);
+/* ---------- 11. 2 小时（滑块上限） ---------- */
+console.log('\n[11] 给足 2 小时');
+const d11 = sample({ ...base, minutes: 120 }, workday, 3000);
+check('校内 14 家全部来得及',
+  E.pickOne(spots, { ...base, minutes: 120 }, workday()).timedCount === 14);
+check('早茶终于进来', rate(d11, '粤式早茶') > 2, `${rate(d11, '粤式早茶').toFixed(1)}%`);
+check('湘菜来得及了，份额抬升', rate(d11, '湘菜小馆') > 2, `${rate(d11, '湘菜小馆').toFixed(1)}%`);
 
 /* ---------- 12. 换一个 ---------- */
 console.log('\n[12] 换一个');
@@ -159,6 +158,33 @@ for (let i = 0; i < 20; i += 1) {
 }
 check('唯一可行项被排除时仍然返回它',
   only.every((r) => r.chosen.spot.name === '便利店饭团'));
+
+/* ---------- 13. 校内外 ---------- */
+console.log('\n[13] 校内外');
+const onSide = E.pickOne(spots, base, workday());
+check('校内候选 14 家', onSide.scored.length === 14, `n=${onSide.scored.length}`);
+check('校内候选里没有校外店', onSide.scored.every((x) => x.spot['校内'] === true));
+
+const offSide = E.pickOne(spots, { ...base, campus: 'off' }, workday());
+check('校外候选 6 家', offSide.scored.length === 6, `n=${offSide.scored.length}`);
+check('校外候选里没有校内店', offSide.scored.every((x) => x.spot['校内'] === false));
+
+check('校外不看时间：10 分钟照样出结果',
+  E.pickOne(spots, { ...base, minutes: 10, campus: 'off' }, workday()).chosen !== null,
+  E.pickOne(spots, { ...base, minutes: 10, campus: 'off' }, workday()).chosen.spot.name);
+check('校内 10 分钟则无解',
+  E.pickOne(spots, { ...base, minutes: 10 }, workday()).reason === 'time');
+
+const offNames = new Set();
+for (let i = 0; i < 300; i += 1) {
+  offNames.add(E.pickOne(spots, { ...base, campus: 'off' }, workday()).chosen.spot.name);
+}
+check('校外时火锅、烤肉都进池子', offNames.has('川味火锅') && offNames.has('烤肉自助'),
+  [...offNames].join(','));
+
+const onOnly = spots.filter((s) => s['校内'] === true);
+check('切到校外但没有校外店时给出 empty',
+  E.pickOne(onOnly, { ...base, campus: 'off' }, workday()).reason === 'empty');
 
 console.log(`\n${failures === 0 ? '全部通过' : `${failures} 项未通过`}\n`);
 process.exit(failures === 0 ? 0 : 1);
