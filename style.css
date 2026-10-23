@@ -238,6 +238,13 @@ button { font: inherit; color: inherit; }
 
 .btn-ghost:hover { border-color: #d6c8b4; color: var(--ink); }
 
+.btn-ghost:disabled {
+  background: #faf7f2;
+  border-color: var(--line-soft);
+  color: var(--ink-3);
+  cursor: default;
+}
+
 .btn-soft {
   flex: 1;
   background: var(--brand-soft);
@@ -298,6 +305,7 @@ button { font: inherit; color: inherit; }
 }
 
 .result-name.rolling { color: var(--ink-3); }
+.result-name.muted { color: var(--ink-3); font-weight: 600; }
 
 .result-note {
   margin: 4px 0 0;

@@ -131,9 +131,11 @@
 
     syncInputs();
     bindEvents();
-    renderSpots();
-    updateStatus();
+    updateStatus();          // 内部首次会渲染清单
     updatePickAvailability();
+
+    // 页面停留跨过饭点时，预计耗时跟着更新
+    setInterval(updateStatus, 60 * 1000);
   }
 
   /* ---------- 渲染 ---------- */
@@ -156,14 +158,26 @@
     const bits = [];
 
     if (ctx.weekend) bits.push('周末 · 耗时上限压到中点');
-    if (ctx.peak > 0.05) bits.push(`饭点 · 折掉 ${Math.round(ctx.queue * 60)} 分钟排队`);
-    if (bits.length === 0) bits.push('非饭点 · 按区间中位估算');
+    if (ctx.peak > 0.05) bits.push('饭点 · 预计耗时推向上限');
+    if (bits.length === 0) bits.push('非饭点 · 按区间中点估算');
 
     $('statusText').textContent = bits.join(' · ');
-    $('statusAvail').textContent = `可用 ${fmtMinutes(ctx.avail * 60)}`;
+    $('statusAvail').textContent = `可用 ${fmtMinutes(ctx.usable)}（已留 ${ctx.buffer} 分）`;
+
+    refreshSpotsIfNeeded(ctx);
   }
 
-  function renderSpots() {
+  /** 清单里每家的预计耗时随饭点变化，状态变了才重建列表 */
+  let spotSig = null;
+  function refreshSpotsIfNeeded(ctx) {
+    const sig = `${ctx.weekend}|${Math.round(ctx.peak * 10)}`;
+    if (sig === spotSig) return;
+    spotSig = sig;
+    renderSpots(ctx);
+  }
+
+  function renderSpots(ctx) {
+    const now = ctx || Engine.buildContext(new Date(), state.minutes);
     const list = $('spotList');
     list.innerHTML = '';
     $('spotCount').textContent = String(state.spots.length);
@@ -187,7 +201,9 @@
       const sub = document.createElement('span');
       sub.className = 's-sub';
       const notePart = spot.note ? ` · ${spot.note}` : '';
-      sub.textContent = `${Math.round(spot.minMinutes)}–${Math.round(spot.maxMinutes)} 分 · 口味 ${spot.taste.toFixed(2)} · ≤${spot.maxPeople} 人${notePart}`;
+      const exp = Math.round(Engine.expectedMinutes(spot, now));
+      const late = exp >= now.usable ? '（来不及）' : '';
+      sub.textContent = `预计 ${exp} 分${late} · 口味 ${spot.taste.toFixed(2)} · ≤${spot.maxPeople} 人${notePart}`;
       nameWrap.appendChild(sub);
 
       const del = document.createElement('button');
@@ -222,12 +238,13 @@
     ul.innerHTML = '';
     const spot = pick.spot;
 
-    const weekendNote = ctx.weekend && spot.maxMinutes > spot.minMinutes
-      ? `${Math.round(spot.minMinutes)}–${Math.round(spot.maxMinutes)} 分（周末压到 ${Math.round(pick.t.cap * 60)}）`
-      : `${Math.round(spot.minMinutes)}–${Math.round(spot.maxMinutes)} 分`;
-
     const rows = [
-      { level: pick.t.level, label: '时间', text: weekendNote, val: `可用 ${fmtMinutes(ctx.avail * 60)}` },
+      {
+        level: 'ok',
+        label: '时间',
+        text: `预计 ${Math.round(pick.exp)} 分钟后吃完`,
+        val: `可用 ${Math.round(ctx.usable)} 分钟`,
+      },
       { level: pick.ta.level, label: '口味', text: `${tasteLabel(spot.taste)} ${spot.taste.toFixed(2)}`, val: `你选 ${state.taste.toFixed(2)}` },
       { level: pick.p.level, label: '人数', text: `建议 ≤ ${spot.maxPeople} 人`, val: `你们 ${state.people} 人` },
     ];
@@ -285,27 +302,48 @@
       excludeId
     );
 
-    if (!result.chosen) return;
+    const card = $('result');
+    const nameEl = $('resultName');
+    card.hidden = false;
+
+    /* 一家都来不及：不硬凑，直接把最快的那家摆出来当参考 */
+    if (result.noMatch) {
+      clearResult();
+      nameEl.classList.remove('rolling');
+      nameEl.classList.add('muted');
+
+      const near = result.nearest[0];
+      $('resultEyebrow').textContent = '没有来得及的';
+      nameEl.textContent = near ? near.spot.name : '—';
+      $('resultNote').textContent = near
+        ? `最快的一家也要 ${Math.round(near.exp)} 分钟，可用只剩 ${Math.round(result.ctx.usable)} 分钟。`
+        : '';
+      $('resultMeta').textContent = near
+        ? `把时间调到 ${Math.ceil(near.exp) + result.ctx.buffer + 1} 分钟以上就能选它。`
+        : '';
+      $('againBtn').disabled = true;
+      state.rolling = false;
+      updatePickAvailability();
+      return;
+    }
 
     state.rolling = true;
     updatePickAvailability();
     $('pickBtn').textContent = '正在挑…';
 
-    const card = $('result');
-    card.hidden = false;
     clearResult();
-    $('resultEyebrow').textContent = result.relaxed ? '勉强能去的' : '就它了';
+    nameEl.classList.remove('muted');
+    $('resultEyebrow').textContent = '就它了';
+    $('againBtn').disabled = false;
 
     const names = result.pool.map((it) => it.spot.name);
-    await rollName($('resultName'), result.chosen.spot.name, names.length > 1 ? names : [result.chosen.spot.name]);
+    await rollName(nameEl, result.chosen.spot.name, names.length > 1 ? names : [result.chosen.spot.name]);
 
     $('resultNote').textContent = result.chosen.spot.note || '';
     renderBreak(result.chosen, result.ctx);
 
-    const matchPct = Math.round(result.chosen.w * 100);
-    $('resultMeta').textContent = result.relaxed
-      ? `${state.spots.length} 家里没有严格合适的，从最接近的 ${result.pool.length} 家里抽的 · 匹配度 ${matchPct}%`
-      : `${state.spots.length} 家里有 ${result.viableCount} 家可去，按权重抽中的 · 匹配度 ${matchPct}%`;
+    $('resultMeta').textContent =
+      `${state.spots.length} 家里 ${result.timedCount} 家来得及（可用 ${Math.round(result.ctx.usable)} 分钟），按口味和人数加权抽中`;
 
     state.lastPickId = result.chosen.spot.id;
     state.rolling = false;

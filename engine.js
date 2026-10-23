@@ -8,20 +8,18 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
-  /* 调参集中在这里，改行为不用翻全文 */
   const TUNING = {
+    bufferMinutes: 5,      // 时间缓冲：可用 = 输入 - 缓冲，且必须「预计耗时 < 可用」
     lightSlope: 0.15,      // 比用户清淡的方向：每单位距离衰减 15%，几乎不罚
     heavyMid: 0.3,         // 比用户重口的方向：绝对差值到这里掉到一半
     heavySlope: 14,        // 越过中点后的陡度
     peopleFalloff: 0.42,   // 每超 1 人的权重系数（可以挤一挤）
-    timeFalloff: 3.5,      // 连最短耗时都不够时的衰减速度
-    queuePeakHours: 0.25,  // 饭点峰值折算 15 分钟排队
-    viable: 0.05,          // 低于此权重视为不可行
+    viable: 0.05,          // 口味/人数权重低于此值时不作首选
     pickFalloff: 0.05,     // 「换一个」时当前这家临时降权
-    relaxCount: 5,         // 全军覆没时取最接近的几家
+    closestCount: 3,       // 无解时给几家最接近的作参考
   };
 
-  /* ---------- 时间 ---------- */
+  /* ---------- 饭点强度 ---------- */
 
   function triangle(m, start, peak, end) {
     if (m <= start || m >= end) return 0;
@@ -36,49 +34,46 @@
     );
   }
 
-  /** 周末压缩后的耗时上限（小时）：1–2h → 1–1.5h，即压到区间中点 */
+  /* ---------- 时间 ---------- */
+
+  /** 周末把耗时上限压到区间中点：1–2h → 1–1.5h。返回分钟。 */
   function effectiveMax(spot, weekend) {
-    const a = spot.minMinutes / 60;
-    const b = spot.maxMinutes / 60;
+    const a = spot.minMinutes;
+    const b = spot.maxMinutes;
     return weekend ? a + (b - a) / 2 : b;
   }
 
   /**
-   * 当下上下文。
-   * 周末：耗时上限压到区间中点。
-   * 饭点：视作耗时趋向上限，先从可用时间里扣掉排队时间。
+   * 一家店在当前时点的预计耗时（分钟）。
+   * 基准取区间中点；饭点排队会把它推向区间上限；周末区间整体下移。
    */
-  function buildContext(date, availableMinutes) {
+  function expectedMinutes(spot, ctx) {
+    const a = spot.minMinutes;
+    const b = effectiveMax(spot, ctx.weekend);
+    const mid = (a + b) / 2;
+    return mid + (b - mid) * ctx.peak;
+  }
+
+  /**
+   * 当下上下文。
+   * usable 是真正拿来卡时间的额度：输入值先扣掉缓冲，避免「刚好卡点」。
+   */
+  function buildContext(date, requestedMinutes) {
     const weekend = date.getDay() === 0 || date.getDay() === 6;
     const peak = peakness(date.getHours() * 60 + date.getMinutes());
-    const queue = peak * TUNING.queuePeakHours;
-    const rawHours = availableMinutes / 60;
     return {
       weekend,
       peak,
-      queue,
-      rawHours,
-      avail: Math.max(rawHours - queue, 5 / 60),
+      requested: requestedMinutes,
+      buffer: TUNING.bufferMinutes,
+      usable: Math.max(requestedMinutes - TUNING.bufferMinutes, 0),
     };
-  }
-
-  function timeFactor(spot, ctx) {
-    const a = spot.minMinutes / 60;
-    const b = effectiveMax(spot, ctx.weekend);
-
-    if (ctx.avail >= b) return { w: 1, level: 'ok', cap: b };
-    if (ctx.avail >= a) {
-      const r = (ctx.avail - a) / Math.max(b - a, 1e-6);
-      return { w: 0.35 + 0.65 * r, level: 'mid', cap: b };
-    }
-    const over = (a - ctx.avail) / Math.max(a, 0.08);
-    return { w: 0.35 * Math.exp(-TUNING.timeFalloff * over), level: 'bad', cap: b };
   }
 
   /* ---------- 口味 ---------- */
 
   /**
-   * 口味权重。用的是口味刻度上的绝对差值，不用归一化比例 ——
+   * 用的是口味刻度上的绝对差值，不用归一化比例 ——
    * 否则拉到头（0 或 1）时剩余空间被压缩，区分度会失真。
    *
    * 比用户清淡的方向近乎不罚（重口的人吃清淡的完全 OK）。
@@ -108,16 +103,21 @@
 
   /* ---------- 汇总 ---------- */
 
+  /**
+   * 时间是一道硬门槛：预计耗时必须严格小于可用时间，否则直接出局。
+   * 口味和人数只在「来得及」的店里决定谁更可能被抽中。
+   */
   function scoreAll(spots, prefs, ctx, excludeId) {
     return spots.map((spot) => {
-      const t = timeFactor(spot, ctx);
+      const exp = expectedMinutes(spot, ctx);
+      const fits = exp < ctx.usable;
       const ta = tasteFactor(spot, prefs.taste);
       const p = peopleFactor(spot, prefs.people);
 
-      let w = t.w * ta.w * p.w;
-      if (spot.id === excludeId) w *= TUNING.pickFalloff;
+      let w = fits ? ta.w * p.w : 0;
+      if (fits && spot.id === excludeId) w *= TUNING.pickFalloff;
 
-      return { spot, w, t, ta, p };
+      return { spot, w, exp, fits, ta, p };
     });
   }
 
@@ -132,32 +132,34 @@
     return items[items.length - 1];
   }
 
-  /** 一步到位：筛池子 → 抽一个 */
+  /** 一步到位：卡时间 → 筛口味人数 → 抽一个 */
   function pickOne(spots, prefs, date, excludeId) {
     const ctx = buildContext(date, prefs.minutes);
-    let scored = scoreAll(spots, prefs, ctx, excludeId);
-    let pool = scored.filter((it) => it.w >= TUNING.viable);
-    let relaxed = false;
+    const scored = scoreAll(spots, prefs, ctx, excludeId);
 
-    // 「换一个」可能把唯一的可选项压到阈值以下。这时候退回不排除重算，
-    // 而不是放宽到「最接近的几家」—— 唯一答案就该还是它。
-    if (pool.length === 0 && excludeId) {
-      scored = scoreAll(spots, prefs, ctx, null);
-      pool = scored.filter((it) => it.w >= TUNING.viable);
+    const nearest = scored
+      .slice()
+      .sort((a, b) => a.exp - b.exp)
+      .slice(0, TUNING.closestCount);
+
+    const timed = scored.filter((it) => it.fits);
+
+    if (timed.length === 0) {
+      return { ctx, scored, pool: [], chosen: null, noMatch: true, timedCount: 0, nearest };
     }
 
-    if (pool.length === 0) {
-      relaxed = true;
-      pool = scored.slice().sort((a, b) => b.w - a.w).slice(0, Math.min(TUNING.relaxCount, scored.length));
-    }
+    // 时间都够、只是口味或人数不理想时，仍然从来得及的店里选，不该报无解
+    let pool = timed.filter((it) => it.w >= TUNING.viable);
+    if (pool.length === 0) pool = timed;
 
     return {
       ctx,
       scored,
       pool,
-      relaxed,
-      viableCount: scored.filter((it) => it.w >= TUNING.viable).length,
-      chosen: pool.length ? weightedPick(pool) : null,
+      nearest,
+      noMatch: false,
+      timedCount: timed.length,
+      chosen: weightedPick(pool),
     };
   }
 
@@ -165,8 +167,8 @@
     TUNING,
     peakness,
     effectiveMax,
+    expectedMinutes,
     buildContext,
-    timeFactor,
     tasteFactor,
     peopleFactor,
     scoreAll,

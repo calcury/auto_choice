@@ -26,110 +26,139 @@ function sample(prefs, dateOrFn, n = 4000) {
     .sort((a, b) => b.pct - a.pct);
 }
 
-const base = { minutes: 90, taste: 0.5, people: 4 };
+const base = { minutes: 90, taste: 0.5, people: 5 };
+const byName = (name) => spots.find((s) => s.name === name);
 const rate = (list, name) => (list.find((x) => x.name === name) || { pct: 0 }).pct;
 
-/* ---------- 1. 默认条件 ---------- */
-console.log('\n[1] 默认：90 分钟 / 不挑 / 4 人 / 周五 15:00');
-const d1 = sample(base, workday);
-d1.slice(0, 6).forEach((x) => console.log(`     ${x.name.padEnd(8, '　')} ${x.pct.toFixed(1)}%`));
-check('耗时 2 小时的烤肉不应出现', rate(d1, '烤肉自助') < 1, `${rate(d1, '烤肉自助').toFixed(1)}%`);
-check('耗时 3 小时的火锅不应出现', rate(d1, '川味火锅') < 1, `${rate(d1, '川味火锅').toFixed(1)}%`);
-check('清单里每家都有机会', new Set(d1.map((x) => x.name)).size >= 10);
+/* ---------- 1. 预计耗时的算法 ---------- */
+console.log('\n[1] 预计耗时怎么算');
+const instant = byName('便利店饭团');           // 5–15 分钟
+const wang = byName('老王牛肉面');              // 30–60 分钟
+const ctxCalm = E.buildContext(workday(), 90);
+const ctxLunch = E.buildContext(lunch(), 90);
+const ctxWeekend = E.buildContext(weekend(), 90);
+check('非饭点 = 区间中点', E.expectedMinutes(instant, ctxCalm) === 10,
+  `${E.expectedMinutes(instant, ctxCalm)} 分`);
+check('饭点峰值 = 区间上限', E.expectedMinutes(instant, ctxLunch) === 15,
+  `${E.expectedMinutes(instant, ctxLunch)} 分`);
+check('11:52 处在中间过渡', (() => {
+  const v = E.expectedMinutes(wang, E.buildContext(new Date(2026, 9, 23, 11, 52), 90));
+  return v > 45 && v < 60;
+})(), `${E.expectedMinutes(wang, E.buildContext(new Date(2026, 9, 23, 11, 52), 90)).toFixed(1)} 分`);
+check('周末上限压到区间中点', E.effectiveMax(wang, true) === 45, `${E.effectiveMax(wang, true)} 分`);
+check('周末预计耗时整体下移', E.expectedMinutes(wang, ctxWeekend) === 37.5,
+  `${E.expectedMinutes(wang, ctxWeekend)} 分`);
 
-/* ---------- 2. 时间收紧 ---------- */
-console.log('\n[2] 只有 5 分钟');
-const d2 = sample({ ...base, minutes: 5 }, workday, 2000);
-console.log(`     ${d2.slice(0, 4).map((x) => `${x.name} ${x.pct.toFixed(0)}%`).join(' | ')}`);
-check('5 分钟基本只剩便利店', rate(d2, '便利店饭团') > 70, `${rate(d2, '便利店饭团').toFixed(0)}%`);
-check('5 分钟不会出现火锅', rate(d2, '川味火锅') === 0);
+/* ---------- 2. 缓冲与严格小于 ---------- */
+console.log('\n[2] 缓冲 5 分钟 + 严格小于');
+check('可用 = 输入 − 5', ctxCalm.usable === 85, `usable=${ctxCalm.usable}`);
 
-/* ---------- 3. 口味：极清淡 ---------- */
-console.log('\n[3] 口味拉到最清淡（0.00）');
-const d3 = sample({ ...base, taste: 0 }, workday, 3000);
-console.log(`     ${d3.slice(0, 5).map((x) => `${x.name} ${x.pct.toFixed(0)}%`).join(' | ')}`);
-check('重口火锅被压到接近 0', rate(d3, '川味火锅') < 1, `${rate(d3, '川味火锅').toFixed(1)}%`);
-check('清淡的沙拉 / 早茶占主导', rate(d3, '轻食沙拉碗') + rate(d3, '粤式早茶') > 25);
+const solo = (minutes) => E.pickOne([wang], { ...base, minutes }, workday());
+check('正好卡点（可用 45，预计 45）不算通过', solo(50).noMatch === true);
+check('多给 1 分钟就通过', solo(51).noMatch === false);
 
-/* ---------- 4. 口味：极重口，清淡不应被罚 ---------- */
-console.log('\n[4] 口味拉到最重口（1.00）');
-const d4 = sample({ ...base, taste: 1 }, workday, 3000);
-console.log(`     ${d4.slice(0, 5).map((x) => `${x.name} ${x.pct.toFixed(0)}%`).join(' | ')}`);
-check('清淡的沙拉仍有可观概率', rate(d4, '轻食沙拉碗') > 4, `${rate(d4, '轻食沙拉碗').toFixed(1)}%`);
-check('清淡的早茶仍有可观概率', rate(d4, '粤式早茶') > 3, `${rate(d4, '粤式早茶').toFixed(1)}%`);
+/* ---------- 3. 默认条件 ---------- */
+console.log('\n[3] 默认：90 分钟 / 不挑 / 5 人 / 周五 15:00');
+const d3 = sample(base, workday);
+d3.slice(0, 6).forEach((x) => console.log(`     ${x.name.padEnd(8, '　')} ${x.pct.toFixed(1)}%`));
+const timely = E.pickOne(spots, base, workday()).timedCount;
+check('16 家里 13 家来得及', timely === 13, `timed=${timely}`);
+check('3 小时的火锅出局', rate(d3, '川味火锅') === 0);
+check('2 小时的烤肉出局', rate(d3, '烤肉自助') === 0);
+check('2 小时的早茶出局', rate(d3, '粤式早茶') === 0);
+check('分布没有一家独大', d3[0].pct < 16, `最高 ${d3[0].pct.toFixed(1)}%`);
+check('来得及的都有机会', d3.length >= 10);
 
-/* ---------- 5. 口味：中间不是峰，而是到某点陡降 ---------- */
-console.log('\n[5] 口味 0.50 时的逐家权重曲线');
-const ctx = E.buildContext(workday(), 90);
-const curve = spots
-  .map((s) => ({ name: s.name, t: s.taste, w: E.tasteFactor(s, 0.5).w }))
-  .sort((a, b) => a.t - b.t);
+/* ---------- 4. 时间收紧 ---------- */
+console.log('\n[4] 时间收紧');
+const r10 = E.pickOne(spots, { ...base, minutes: 10 }, workday());
+check('10 分钟无解（可用只剩 5）', r10.noMatch === true, `usable=${r10.ctx.usable}`);
+check('无解时给出最快的一家', r10.nearest[0].spot.name === '便利店饭团', r10.nearest[0].spot.name);
+
+const d20 = sample({ ...base, minutes: 20 }, workday(), 2000);
+check('20 分钟只剩便利店', d20.length === 1 && d20[0].name === '便利店饭团',
+  d20.map((x) => x.name).join(','));
+
+const d30 = sample({ ...base, minutes: 30 }, workday(), 2000);
+check('30 分钟沙县仍出局（25 不严格小于 25）', rate(d30, '沙县小吃') === 0,
+  d30.map((x) => x.name).join(','));
+
+const d35 = sample({ ...base, minutes: 35 }, workday(), 2000);
+check('35 分钟沙县才进来', rate(d35, '沙县小吃') > 0,
+  d35.map((x) => x.name).join(','));
+
+/* ---------- 5. 口味：极清淡 ---------- */
+console.log('\n[5] 口味拉到最清淡（0.00），默认 90 分钟');
+const d5 = sample({ ...base, taste: 0 }, workday, 3000);
+console.log(`     ${d5.slice(0, 5).map((x) => `${x.name} ${x.pct.toFixed(0)}%`).join(' | ')}`);
+check('重口火锅来不及，权重也为 0', rate(d5, '川味火锅') === 0);
+check('清淡的沙拉明显占优', rate(d5, '轻食沙拉碗') > 25, `${rate(d5, '轻食沙拉碗').toFixed(0)}%`);
+check('早茶 90 分钟来不及，自然不出现', rate(d5, '粤式早茶') === 0);
+
+/* ---------- 6. 口味：极重口（放长到 3 小时，排除时间门槛干扰） ---------- */
+console.log('\n[6] 口味拉到最重口（1.00），180 分钟');
+const d6 = sample({ ...base, minutes: 180, taste: 1 }, workday, 3000);
+console.log(`     ${d6.slice(0, 5).map((x) => `${x.name} ${x.pct.toFixed(0)}%`).join(' | ')}`);
+check('清淡的沙拉仍有可观概率', rate(d6, '轻食沙拉碗') > 4, `${rate(d6, '轻食沙拉碗').toFixed(1)}%`);
+check('清淡的早茶仍有可观概率', rate(d6, '粤式早茶') > 3, `${rate(d6, '粤式早茶').toFixed(1)}%`);
+
+/* ---------- 7. 口味曲线 ---------- */
+console.log('\n[7] 口味 0.50 时的逐家权重');
+const curve = spots.map((s) => ({ t: s.taste, w: E.tasteFactor(s, 0.5).w })).sort((a, b) => a.t - b.t);
 console.log(`     ${curve.map((c) => `${c.t.toFixed(2)}:${c.w.toFixed(2)}`).join('  ')}`);
-const heavyEnd = curve[curve.length - 1].w;
-const lightEnd = curve[0].w;
-check('最重口一端被陡降', heavyEnd < 0.15, `w=${heavyEnd.toFixed(3)}`);
-check('最清淡一端几乎不降', lightEnd > 0.8, `w=${lightEnd.toFixed(3)}`);
+check('最重口一端被陡降', curve[curve.length - 1].w < 0.15, `w=${curve[curve.length - 1].w.toFixed(3)}`);
+check('最清淡一端几乎不降', curve[0].w > 0.8, `w=${curve[0].w.toFixed(3)}`);
 check('中间段保持高位', curve.filter((c) => c.w > 0.6).length >= 5);
 
-/* ---------- 6. 周六压缩 ---------- */
-console.log('\n[6] 周末耗时上限压缩');
-const capWorkday = E.effectiveMax(spots.find((s) => s.name === '港式茶餐厅'), false) * 60;
-const capWeekend = E.effectiveMax(spots.find((s) => s.name === '港式茶餐厅'), true) * 60;
-check('40–80 分 → 周末压到 60 分', Math.round(capWorkday) === 80 && Math.round(capWeekend) === 60,
-  `${Math.round(capWorkday)} → ${Math.round(capWeekend)}`);
-const rw = E.pickOne(spots, { ...base, minutes: 75 }, weekend());
-const rh = E.pickOne(spots, { ...base, minutes: 75 }, workday());
-const pickW = (r, name) => r.scored.find((x) => x.spot.name === name).w;
-check('75 分钟时周末的茶餐厅权重高于平日',
-  pickW(rw, '港式茶餐厅') > pickW(rh, '港式茶餐厅'),
-  `${pickW(rw, '港式茶餐厅').toFixed(2)} > ${pickW(rh, '港式茶餐厅').toFixed(2)}`);
+/* ---------- 8. 饭点收紧 ---------- */
+console.log('\n[8] 12:15 午饭高峰');
+const calm = E.pickOne(spots, base, workday());
+const rush = E.pickOne(spots, base, lunch());
+check('饭点来得及的店更少', rush.timedCount < calm.timedCount, `${calm.timedCount} → ${rush.timedCount}`);
+const hunan = byName('湘菜小馆');
+check('湘菜非饭点来得及、饭点来不及',
+  E.expectedMinutes(hunan, calm.ctx) < calm.ctx.usable &&
+  E.expectedMinutes(hunan, rush.ctx) >= rush.ctx.usable,
+  `${E.expectedMinutes(hunan, calm.ctx).toFixed(0)} / ${E.expectedMinutes(hunan, rush.ctx).toFixed(0)} 分`);
 
-/* ---------- 7. 饭点折算 ---------- */
-console.log('\n[7] 12:15 午饭高峰折算排队时间');
-const cLunch = E.buildContext(lunch(), 90);
-const cCalm = E.buildContext(workday(), 90);
-check('12:15 峰值接近 1', cLunch.peak > 0.95, `peak=${cLunch.peak.toFixed(2)}`);
-check('可用时间从 90 分钟折到 75 分钟', Math.round(cLunch.avail * 60) === 75,
-  `${Math.round(cLunch.avail * 60)} 分`);
-const hotA = E.timeFactor(spots.find((s) => s.name === '川味火锅'), cCalm).w;
-const hotB = E.timeFactor(spots.find((s) => s.name === '川味火锅'), cLunch).w;
-check('火锅在饭点更难被选中', hotB < hotA, `${hotA.toFixed(2)} → ${hotB.toFixed(2)}`);
+/* ---------- 9. 周末 ---------- */
+console.log('\n[9] 周末');
+const wk = E.pickOne(spots, base, weekend());
+check('周末来得及的店比平日多', wk.timedCount > calm.timedCount, `${calm.timedCount} → ${wk.timedCount}`);
+check('周末的湘菜仍在池子里', wk.scored.find((x) => x.spot.name === '湘菜小馆').fits === true);
 
-/* ---------- 8. 人数 ---------- */
-console.log('\n[8] 9 个人（滑块上限）');
-const d8 = sample({ ...base, people: 9 }, workday, 3000);
-console.log(`     ${d8.slice(0, 5).map((x) => `${x.name} ${x.pct.toFixed(0)}%`).join(' | ')}`);
-check('只能坐 4 人的沙县基本出局', rate(d8, '沙县小吃') < 1, `${rate(d8, '沙县小吃').toFixed(1)}%`);
-const bigTable = ['一层员工食堂', '二层盖浇饭窗口', '东北饺子馆', '粤式早茶', '川味火锅']
-  .reduce((sum, name) => sum + rate(d8, name), 0);
-check('能坐 10 人以上的店占主导', bigTable > 60, `${bigTable.toFixed(0)}%`);
+/* ---------- 10. 人数 ---------- */
+console.log('\n[10] 9 个人（滑块上限）');
+const d10 = sample({ ...base, people: 9 }, workday, 3000);
+console.log(`     ${d10.slice(0, 5).map((x) => `${x.name} ${x.pct.toFixed(0)}%`).join(' | ')}`);
+check('只能坐 4 人的沙县基本出局', rate(d10, '沙县小吃') < 1, `${rate(d10, '沙县小吃').toFixed(1)}%`);
+const bigTable = ['一层员工食堂', '二层盖浇饭窗口', '东北饺子馆', '川味火锅']
+  .reduce((sum, name) => sum + rate(d10, name), 0);
+check('能坐 10 人的店占明显多数', bigTable > 55, `${bigTable.toFixed(0)}%`);
 
-/* ---------- 9. 3 小时全开 ---------- */
-console.log('\n[9] 给足 3 小时');
-const d9 = sample({ ...base, minutes: 180, taste: 0.5, people: 4 }, workday, 3000);
-const hot = spots.find((s) => s.name === '川味火锅');
-const hotTime = (mins) => E.timeFactor(hot, E.buildContext(workday(), mins)).w;
-check('火锅的时间权重从 0.35 提到 1', hotTime(90).toFixed(2) === '0.35' && hotTime(180) === 1,
-  `${hotTime(90).toFixed(2)} → ${hotTime(180).toFixed(2)}`);
-check('火锅终于有机会出现', rate(d9, '川味火锅') > 0.3, `${rate(d9, '川味火锅').toFixed(1)}%`);
-check('烤肉也上场', rate(d9, '烤肉自助') > 1, `${rate(d9, '烤肉自助').toFixed(1)}%`);
-console.log('     注：权重被口味压着（0.95 对「不挑」算很远），所以出现率仍低，属预期');
+/* ---------- 11. 3 小时 ---------- */
+console.log('\n[11] 给足 3 小时');
+const d11 = sample({ ...base, minutes: 180 }, workday, 3000);
+check('火锅终于来得及', rate(d11, '川味火锅') > 0.3, `${rate(d11, '川味火锅').toFixed(1)}%`);
+check('烤肉也来得及', rate(d11, '烤肉自助') > 1, `${rate(d11, '烤肉自助').toFixed(1)}%`);
+check('3 小时时全部 16 家都来得及',
+  E.pickOne(spots, { ...base, minutes: 180 }, workday()).timedCount === 16);
 
-/* ---------- 10. 无解时兜底 ---------- */
-console.log('\n[10] 极端条件兜底（5 分钟 + 9 人）');
-const r10 = E.pickOne(spots, { ...base, minutes: 5, people: 9 }, workday());
-check('仍然有结果，不崩', Boolean(r10.chosen));
-check('标记为放宽模式', r10.relaxed === true);
-console.log(`     → ${r10.chosen.spot.name}（匹配度 ${(r10.chosen.w * 100).toFixed(0)}%）`);
+/* ---------- 12. 换一个 ---------- */
+console.log('\n[12] 换一个');
+const firstPick = E.pickOne(spots, base, workday());
+const first = firstPick.pool[0];
+const again = E.pickOne(spots, base, workday(), first.spot.id);
+check('被排除的那家权重降到 1/20',
+  Math.abs(again.scored.find((x) => x.spot.id === first.spot.id).w - first.ta.w * first.p.w * 0.05) < 1e-9);
+check('换一个不会返回同一家（池子里还有别的）', again.chosen.spot.id !== first.spot.id);
 
-/* ---------- 11. 「换一个」只有唯一可行项时不该放宽 ---------- */
-console.log('\n[11] 5 分钟反复换一个');
-const only = new Set();
-for (let i = 0; i < 30; i += 1) {
-  const r = E.pickOne(spots, { ...base, minutes: 5 }, workday(), i === 0 ? null : 'convenience');
-  only.add(`${r.chosen.spot.name}|${r.relaxed}`);
+const only = [];
+for (let i = 0; i < 20; i += 1) {
+  only.push(E.pickOne(spots, { ...base, minutes: 20 }, workday(), 'convenience'));
 }
-check('唯一可行项始终是便利店且不放宽', only.size === 1 && only.has('便利店饭团|false'), [...only].join(','));
+check('唯一可行项被排除时仍然返回它',
+  only.every((r) => r.chosen.spot.name === '便利店饭团'));
 
 console.log(`\n${failures === 0 ? '全部通过' : `${failures} 项未通过`}\n`);
 process.exit(failures === 0 ? 0 : 1);
