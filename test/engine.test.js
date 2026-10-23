@@ -26,7 +26,7 @@ function sample(prefs, dateOrFn, n = 4000) {
     .sort((a, b) => b.pct - a.pct);
 }
 
-const base = { minutes: 90, taste: 0.5, people: 4, history: [] };
+const base = { minutes: 90, taste: 0.5, people: 4 };
 const rate = (list, name) => (list.find((x) => x.name === name) || { pct: 0 }).pct;
 
 /* ---------- 1. 默认条件 ---------- */
@@ -120,12 +120,14 @@ check('仍然有结果，不崩', Boolean(r10.chosen));
 check('标记为放宽模式', r10.relaxed === true);
 console.log(`     → ${r10.chosen.spot.name}（匹配度 ${(r10.chosen.w * 100).toFixed(0)}%）`);
 
-/* ---------- 11. 历史降权 ---------- */
-console.log('\n[11] 刚吃过的会被降权');
-const ctxH = E.buildContext(workday(), 90);
-const noHist = E.scoreAll(spots, { ...base, history: [] }, ctxH).find((x) => x.spot.name === '老王牛肉面').w;
-const withHist = E.scoreAll(spots, { ...base, history: ['noodle-wang'] }, ctxH).find((x) => x.spot.name === '老王牛肉面').w;
-check('权重降到 1/4', Math.abs(withHist - noHist * 0.25) < 1e-9, `${noHist.toFixed(3)} → ${withHist.toFixed(3)}`);
+/* ---------- 11. 「换一个」只有唯一可行项时不该放宽 ---------- */
+console.log('\n[11] 5 分钟反复换一个');
+const only = new Set();
+for (let i = 0; i < 30; i += 1) {
+  const r = E.pickOne(spots, { ...base, minutes: 5 }, workday(), i === 0 ? null : 'convenience');
+  only.add(`${r.chosen.spot.name}|${r.relaxed}`);
+}
+check('唯一可行项始终是便利店且不放宽', only.size === 1 && only.has('便利店饭团|false'), [...only].join(','));
 
 console.log(`\n${failures === 0 ? '全部通过' : `${failures} 项未通过`}\n`);
 process.exit(failures === 0 ? 0 : 1);

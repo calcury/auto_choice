@@ -16,7 +16,6 @@
     peopleFalloff: 0.42,   // 每超 1 人的权重系数（可以挤一挤）
     timeFalloff: 3.5,      // 连最短耗时都不够时的衰减速度
     queuePeakHours: 0.25,  // 饭点峰值折算 15 分钟排队
-    historyDamp: 0.25,     // 最近吃过的降权
     viable: 0.05,          // 低于此权重视为不可行
     pickFalloff: 0.05,     // 「换一个」时当前这家临时降权
     relaxCount: 5,         // 全军覆没时取最接近的几家
@@ -110,14 +109,12 @@
   /* ---------- 汇总 ---------- */
 
   function scoreAll(spots, prefs, ctx, excludeId) {
-    const history = prefs.history || [];
     return spots.map((spot) => {
       const t = timeFactor(spot, ctx);
       const ta = tasteFactor(spot, prefs.taste);
       const p = peopleFactor(spot, prefs.people);
 
       let w = t.w * ta.w * p.w;
-      if (history.indexOf(spot.id) !== -1) w *= TUNING.historyDamp;
       if (spot.id === excludeId) w *= TUNING.pickFalloff;
 
       return { spot, w, t, ta, p };

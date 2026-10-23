@@ -6,7 +6,6 @@
 
   const Engine = window.Engine;
   const KEY_SPOTS = 'auto_choice.spots.v1';
-  const KEY_HISTORY = 'auto_choice.history.v1';
   const DATA_URL = './data/restaurants.json';
 
   /* 默认清单：仓库 data/restaurants.json 的副本。
@@ -35,7 +34,6 @@
     taste: 0.5,
     people: 4,
     spots: [],
-    history: [],
     lastPickId: null,
     rolling: false,
   };
@@ -116,8 +114,8 @@
   }
 
   async function boot() {
-    const savedHistory = readStore(KEY_HISTORY);
-    state.history = Array.isArray(savedHistory) ? savedHistory : [];
+    // 旧版「记下这顿」的遗留，清掉
+    try { localStorage.removeItem('auto_choice.history.v1'); } catch (_) { /* 忽略 */ }
 
     const saved = readStore(KEY_SPOTS);
     if (Array.isArray(saved) && saved.length) {
@@ -282,7 +280,7 @@
 
     const result = Engine.pickOne(
       state.spots,
-      { minutes: state.minutes, taste: state.taste, people: state.people, history: state.history },
+      { minutes: state.minutes, taste: state.taste, people: state.people },
       new Date(),
       excludeId
     );
@@ -308,9 +306,6 @@
     $('resultMeta').textContent = result.relaxed
       ? `${state.spots.length} 家里没有严格合适的，从最接近的 ${result.pool.length} 家里抽的 · 匹配度 ${matchPct}%`
       : `${state.spots.length} 家里有 ${result.viableCount} 家可去，按权重抽中的 · 匹配度 ${matchPct}%`;
-
-    $('acceptBtn').textContent = '记下这顿';
-    $('acceptBtn').disabled = false;
 
     state.lastPickId = result.chosen.spot.id;
     state.rolling = false;
@@ -338,14 +333,6 @@
 
     $('pickBtn').addEventListener('click', () => pick(state.lastPickId));
     $('againBtn').addEventListener('click', () => pick(state.lastPickId));
-
-    $('acceptBtn').addEventListener('click', (e) => {
-      if (!state.lastPickId) return;
-      state.history = [state.lastPickId, ...state.history.filter((id) => id !== state.lastPickId)].slice(0, 5);
-      writeStore(KEY_HISTORY, state.history);
-      e.target.textContent = '已记下，下次会避开';
-      e.target.disabled = true;
-    });
 
     $('addTaste').addEventListener('input', (e) => {
       $('addTasteOut').textContent = tasteLabel(Number(e.target.value) / 100);
