@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f3ec">
+<title>今天吃哪儿</title>
+<meta name="description" content="给三个条件，随机替你挑一个吃饭的地方。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.88em' font-size='86'>🍜</text></svg>">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <h1>今天吃哪儿</h1>
+    <p class="hero-sub">给个条件，让它替你决定。</p>
+  </header>
+
+  <div id="status" class="status" role="status">
+    <span id="statusText">正在读取餐馆清单…</span>
+    <span id="statusAvail" class="status-avail"></span>
+  </div>
+
+  <section class="panel" aria-label="筛选条件">
+    <div class="field">
+      <div class="field-head">
+        <label for="time">可用时间</label>
+        <output id="timeOut" for="time">1 小时 30 分</output>
+      </div>
+      <input id="time" type="range" min="5" max="180" step="5" value="90">
+      <div class="ticks"><span>5 分</span><span>1 小时</span><span>3 小时</span></div>
+    </div>
+
+    <div class="field">
+      <div class="field-head">
+        <label for="taste">口味</label>
+        <output id="tasteOut" for="taste">不挑</output>
+      </div>
+      <div class="track-wrap">
+        <input id="taste" class="on-track" type="range" min="0" max="100" step="1" value="50">
+      </div>
+      <div class="ticks"><span>清淡</span><span>均衡</span><span>重口</span></div>
+    </div>
+
+    <div class="field">
+      <div class="field-head">
+        <label for="people">人数</label>
+        <output id="peopleOut" for="people">4 人</output>
+      </div>
+      <input id="people" type="range" min="1" max="10" step="1" value="4">
+      <div class="ticks"><span>1</span><span>5</span><span>10</span></div>
+    </div>
+  </section>
+
+  <button id="pickBtn" class="btn-primary" type="button">帮我选一个</button>
+
+  <section id="result" class="result" hidden aria-live="polite">
+    <p class="result-eyebrow" id="resultEyebrow">就它了</p>
+    <h2 id="resultName" class="result-name">—</h2>
+    <p id="resultNote" class="result-note"></p>
+    <ul id="resultBreak" class="break"></ul>
+    <div class="result-actions">
+      <button id="againBtn" class="btn-ghost" type="button">换一个</button>
+      <button id="acceptBtn" class="btn-soft" type="button">记下这顿</button>
+    </div>
+    <p id="resultMeta" class="result-meta"></p>
+  </section>
+
+  <details class="manage">
+    <summary>
+      <span>餐馆清单</span>
+      <span id="spotCount" class="pill">0</span>
+    </summary>
+
+    <div class="manage-body">
+      <ul id="spotList" class="spot-list"></ul>
+
+      <form id="addForm" class="add-form" autocomplete="off">
+        <p class="form-title">添加一家</p>
+        <div class="row">
+          <input id="addName" type="text" placeholder="名称，例如 街角米线" maxlength="24" required>
+        </div>
+        <div class="row three">
+          <label class="mini">
+            <span>最快（分）</span>
+            <input id="addMin" type="number" min="1" max="240" step="5" value="30" required>
+          </label>
+          <label class="mini">
+            <span>最慢（分）</span>
+            <input id="addMax" type="number" min="1" max="240" step="5" value="60" required>
+          </label>
+          <label class="mini">
+            <span>最多人数</span>
+            <input id="addPeople" type="number" min="1" max="99" step="1" value="8" required>
+          </label>
+        </div>
+        <div class="row">
+          <label class="mini wide">
+            <span>口味 <em id="addTasteOut">均衡</em></span>
+            <input id="addTaste" type="range" min="0" max="100" step="1" value="50">
+          </label>
+        </div>
+        <button class="btn-soft full" type="submit">加入清单</button>
+        <p id="addError" class="form-error" hidden></p>
+      </form>
+
+      <div class="manage-actions">
+        <button id="reloadBtn" class="btn-mini" type="button">从仓库重载</button>
+        <button id="exportBtn" class="btn-mini" type="button">导出 JSON</button>
+        <label class="btn-mini" for="importInput">导入 JSON</label>
+        <input id="importInput" type="file" accept=".json,application/json" hidden>
+      </div>
+
+      <p class="hint">改动自动存在浏览器本地。导出的 JSON 可以直接替换仓库里的 <code>data/restaurants.json</code>。</p>
+    </div>
+  </details>
+
+  <footer class="foot">
+    <p>规则在 <code>app.js</code> 里，数据在 <code>data/restaurants.json</code> 里。</p>
+  </footer>
+
+</div>
+<script src="./engine.js" defer></script>
+<script src="./app.js" defer></script>
+</body>
+</html>

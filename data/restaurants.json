@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "note": "minMinutes/maxMinutes 单位为分钟；taste 0=极清淡 1=极重口；maxPeople 为建议人数上限。直接改这个文件并推送，页面「从仓库重载」即可生效。",
+  "restaurants": [
+    {
+      "id": "canteen-1",
+      "name": "一层员工食堂",
+      "minMinutes": 20,
+      "maxMinutes": 45,
+      "taste": 0.25,
+      "maxPeople": 12,
+      "note": "打饭快，菜式轮换"
+    },
+    {
+      "id": "canteen-2",
+      "name": "二层盖浇饭窗口",
+      "minMinutes": 25,
+      "maxMinutes": 50,
+      "taste": 0.45,
+      "maxPeople": 10,
+      "note": "现炒，饭点要等"
+    },
+    {
+      "id": "noodle-wang",
+      "name": "老王牛肉面",
+      "minMinutes": 30,
+      "maxMinutes": 60,
+      "taste": 0.55,
+      "maxPeople": 6,
+      "note": "汤头浓，出餐稳定"
+    },
+    {
+      "id": "shaxian",
+      "name": "沙县小吃",
+      "minMinutes": 15,
+      "maxMinutes": 35,
+      "taste": 0.4,
+      "maxPeople": 4,
+      "note": "快，位子少"
+    },
+    {
+      "id": "mcd",
+      "name": "麦当劳",
+      "minMinutes": 15,
+      "maxMinutes": 40,
+      "taste": 0.6,
+      "maxPeople": 8,
+      "note": "自助点单，不挑人"
+    },
+    {
+      "id": "salad",
+      "name": "轻食沙拉碗",
+      "minMinutes": 20,
+      "maxMinutes": 40,
+      "taste": 0.08,
+      "maxPeople": 6,
+      "note": "冷食，吃完不困"
+    },
+    {
+      "id": "hunan",
+      "name": "湘菜小馆",
+      "minMinutes": 60,
+      "maxMinutes": 100,
+      "taste": 0.85,
+      "maxPeople": 10,
+      "note": "辣，适合多人点菜"
+    },
+    {
+      "id": "hotpot",
+      "name": "川味火锅",
+      "minMinutes": 90,
+      "maxMinutes": 180,
+      "taste": 0.95,
+      "maxPeople": 12,
+      "note": "耗时大户，得留足时间"
+    },
+    {
+      "id": "japanese",
+      "name": "日式定食",
+      "minMinutes": 45,
+      "maxMinutes": 75,
+      "taste": 0.3,
+      "maxPeople": 6,
+      "note": "安静，出餐稍慢"
+    },
+    {
+      "id": "lanzhou",
+      "name": "兰州拉面",
+      "minMinutes": 25,
+      "maxMinutes": 50,
+      "taste": 0.45,
+      "maxPeople": 8,
+      "note": "翻台快"
+    },
+    {
+      "id": "chachanteng",
+      "name": "港式茶餐厅",
+      "minMinutes": 40,
+      "maxMinutes": 80,
+      "taste": 0.35,
+      "maxPeople": 8,
+      "note": "选择多，适合凑人"
+    },
+    {
+      "id": "bbq",
+      "name": "烤肉自助",
+      "minMinutes": 120,
+      "maxMinutes": 180,
+      "taste": 0.9,
+      "maxPeople": 10,
+      "note": "至少两小时，别赶时间"
+    },
+    {
+      "id": "dumpling",
+      "name": "东北饺子馆",
+      "minMinutes": 35,
+      "maxMinutes": 70,
+      "taste": 0.5,
+      "maxPeople": 10,
+      "note": "实在，管饱"
+    },
+    {
+      "id": "thai",
+      "name": "泰式咖喱",
+      "minMinutes": 50,
+      "maxMinutes": 90,
+      "taste": 0.75,
+      "maxPeople": 6,
+      "note": "偏甜辣，评价两极"
+    },
+    {
+      "id": "convenience",
+      "name": "便利店饭团",
+      "minMinutes": 5,
+      "maxMinutes": 15,
+      "taste": 0.3,
+      "maxPeople": 2,
+      "note": "赶时间专属，站着吃"
+    },
+    {
+      "id": "dimsum",
+      "name": "粤式早茶",
+      "minMinutes": 60,
+      "maxMinutes": 120,
+      "taste": 0.2,
+      "maxPeople": 12,
+      "note": "清淡，但要慢慢吃"
+    }
+  ]
+}
