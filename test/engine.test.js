@@ -96,11 +96,13 @@ const hotB = E.timeFactor(spots.find((s) => s.name === '川味火锅'), cLunch).
 check('火锅在饭点更难被选中', hotB < hotA, `${hotA.toFixed(2)} → ${hotB.toFixed(2)}`);
 
 /* ---------- 8. 人数 ---------- */
-console.log('\n[8] 10 个人');
-const d8 = sample({ ...base, people: 10 }, workday, 3000);
+console.log('\n[8] 9 个人（滑块上限）');
+const d8 = sample({ ...base, people: 9 }, workday, 3000);
 console.log(`     ${d8.slice(0, 5).map((x) => `${x.name} ${x.pct.toFixed(0)}%`).join(' | ')}`);
 check('只能坐 4 人的沙县基本出局', rate(d8, '沙县小吃') < 1, `${rate(d8, '沙县小吃').toFixed(1)}%`);
-check('能坐 12 人的食堂 / 火锅上场', rate(d8, '一层员工食堂') + rate(d8, '川味火锅') > 20);
+const bigTable = ['一层员工食堂', '二层盖浇饭窗口', '东北饺子馆', '粤式早茶', '川味火锅']
+  .reduce((sum, name) => sum + rate(d8, name), 0);
+check('能坐 10 人以上的店占主导', bigTable > 60, `${bigTable.toFixed(0)}%`);
 
 /* ---------- 9. 3 小时全开 ---------- */
 console.log('\n[9] 给足 3 小时');
@@ -114,8 +116,8 @@ check('烤肉也上场', rate(d9, '烤肉自助') > 1, `${rate(d9, '烤肉自助
 console.log('     注：权重被口味压着（0.95 对「不挑」算很远），所以出现率仍低，属预期');
 
 /* ---------- 10. 无解时兜底 ---------- */
-console.log('\n[10] 极端条件兜底（5 分钟 + 10 人）');
-const r10 = E.pickOne(spots, { ...base, minutes: 5, people: 10 }, workday());
+console.log('\n[10] 极端条件兜底（5 分钟 + 9 人）');
+const r10 = E.pickOne(spots, { ...base, minutes: 5, people: 9 }, workday());
 check('仍然有结果，不崩', Boolean(r10.chosen));
 check('标记为放宽模式', r10.relaxed === true);
 console.log(`     → ${r10.chosen.spot.name}（匹配度 ${(r10.chosen.w * 100).toFixed(0)}%）`);

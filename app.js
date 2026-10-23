@@ -32,7 +32,7 @@
   const state = {
     minutes: 90,
     taste: 0.5,
-    people: 4,
+    people: 5,
     spots: [],
     lastPickId: null,
     rolling: false,
